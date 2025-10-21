@@ -1,3 +1,4 @@
+
 Proyek full-stack untuk memonitor dan mengontrol sistem pembersih panel surya otomatis berbasis IoT. Proyek ini mencakup antarmuka web real-time, server backend, dan firmware untuk perangkat keras Arduino/ESP8266.
 
 ✨ Fitur Utama
@@ -74,5 +75,5 @@ Backend API berjalan di http://localhost:5000.
 ├── backend.Dockerfile              # Instruksi build Docker untuk backend
 ├── frontend.Dockerfile             # Instruksi build Docker untuk frontend
 ├── mosquitto.conf                  # Konfigurasi broker MQTT
-└── package.json                    # Dependensi frontend
+├── package.json                    # Dependensi frontend
 └── requirements.txt                # Dependensi backend
