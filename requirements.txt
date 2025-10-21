@@ -1,0 +1,7 @@
+Flask
+Flask-SocketIO
+Flask-Cors
+eventlet
+paho-mqtt
+requests
+psycopg2-binary

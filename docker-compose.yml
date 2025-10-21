@@ -1,0 +1,80 @@
+# File ini mendefinisikan dan menjalankan semua layanan aplikasi Anda.
+version: '3.8'
+
+services:
+  # 1. Layanan Frontend (React/Vite)
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend.Dockerfile
+    ports:
+      - "5173:5173" # Membuka port Vite ke komputer Anda
+    volumes:
+      - .:/app # Sinkronisasi kode lokal dengan container untuk pengembangan
+      - /app/node_modules
+    depends_on:
+      - backend
+
+  # 2. Layanan Backend (Python/Flask)
+  backend:
+    build:
+      context: .
+      dockerfile: backend.Dockerfile
+    ports:
+      - "5000:5000" # Membuka port Flask ke komputer Anda
+    volumes:
+      - .:/app # Sinkronisasi kode
+    environment:
+      # Variabel ini akan dibaca oleh backend.py
+      - TZ=Asia/Jakarta
+      - DB_HOST=postgres
+      - DB_NAME=solar_cleaner_db
+      - DB_USER=postgres
+      - DB_PASSWORD=ttz
+      - MQTT_BROKER=mosquitto
+    depends_on:
+      postgres: # <-- UBAH DI SINI
+        condition: service_healthy # <-- TAMBAHKAN INI
+      mosquitto:
+        condition: service_started
+
+  # 3. Layanan Simulator Robot (Python)
+  #simulator:
+    ##context: .
+      #dockerfile: simulator.Dockerfile
+    #volumes:
+      #- .:/app # Sinkronisasi kode
+    #environment:
+      #- MQTT_BROKER=mosquitto
+    #depends_on:
+      #- mosquitto
+
+  # 4. Layanan Broker MQTT (Mosquitto)
+  mosquitto:
+    image: eclipse-mosquitto:latest
+    ports:
+      - "1883:1883" # Penting agar Arduino fisik nanti bisa terhubung
+      - "9001:9001"
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
+
+  # 5. Layanan Database (PostgreSQL)
+  postgres:
+    image: postgres:latest
+    environment:
+      # Membuat database dan user saat container pertama kali dibuat
+      - POSTGRES_DB=solar_cleaner_db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=ttz
+    ports:
+      - "5433:5432" # Membuka port DB ke komputer Anda
+    volumes:
+      - postgres_data:/var/lib/postgresql/data # Menyimpan data DB secara permanen
+    healthcheck: # <-- TAMBAHKAN SELURUH BLOK INI
+      test: ["CMD-SHELL", "pg_isready -U postgres -d solar_cleaner_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
