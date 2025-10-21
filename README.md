@@ -1,79 +1,48 @@
+# ☀️ Solar Panel Cleaner
 
-Proyek full-stack untuk memonitor dan mengontrol sistem pembersih panel surya otomatis berbasis IoT. Proyek ini mencakup antarmuka web real-time, server backend, dan firmware untuk perangkat keras Arduino/ESP8266.
+Proyek **full-stack IoT** untuk memonitor dan mengontrol sistem pembersih panel surya otomatis.  
+Mencakup **antarmuka web real-time**, **server backend**, dan **firmware** untuk perangkat keras **Arduino/ESP8266**.
 
-✨ Fitur Utama
+---
 
-Kontrol Real-time: Memulai, menghentikan, dan memantau proses pembersihan secara langsung dari antarmuka web.
+## ✨ Fitur Utama
 
-Progress Bar Akurat: Visualisasi progress bar yang sinkron dengan pergerakan fisik robot.
+- **Kontrol Real-time** — Memulai, menghentikan, dan memantau proses pembersihan langsung dari antarmuka web.
+- **Progress Bar Akurat** — Visualisasi progress bar yang sinkron dengan pergerakan fisik robot.
+- **Penjadwalan Otomatis** — Atur hingga tiga jadwal pembersihan harian yang disimpan di database.
+- **Kontrol Pompa Air** — Otomatisasi penyemprotan air selama fase pembersihan.
+- **Riwayat Aktivitas** — Semua aktivitas (mulai, berhenti, selesai, jadwal) dicatat dan disimpan.
+- **Arsitektur Berbasis Event** — Menggunakan **MQTT** untuk komunikasi yang andal antara backend dan perangkat IoT.
+- **Siap Dikembangkan** — Dikemas sepenuhnya dalam **Docker** untuk kemudahan setup dan deployment.
 
-Penjadwalan Otomatis: Atur hingga tiga jadwal pembersihan harian yang disimpan secara permanen di database.
+---
 
-Kontrol Pompa Air: Otomatisasi penyemprotan air selama fase pembersihan.
+## 🛠️ Teknologi yang Digunakan
 
-Riwayat Aktivitas: Semua aktivitas (mulai, berhenti, selesai, jadwal) dicatat dan disimpan di database untuk pelacakan.
+| Komponen | Teknologi |
+|-----------|------------|
+| **Frontend** | React (Vite), Tailwind CSS |
+| **Backend** | Python (Flask, Flask-SocketIO) |
+| **Web Realtime** | WebSocket (via Socket.IO) |
+| **IoT Realtime** | MQTT |
+| **Database** | PostgreSQL |
+| **Hardware** | ESP8266 / Arduino |
+| **Containerization** | Docker, Docker Compose |
 
-Arsitektur Berbasis Event: Menggunakan MQTT untuk komunikasi yang andal antara backend dan perangkat IoT.
+---
 
-Siap Dikembangkan: Dibungkus sepenuhnya dalam Docker untuk kemudahan setup dan deployment.
+## 🚀 Cara Menjalankan (Menggunakan Docker)
 
-🛠️ Teknologi yang Digunakan
+Cara yang direkomendasikan untuk menjalankan seluruh sistem dengan mudah.
 
-Frontend: React (Vite), Tailwind CSS
+### 🧩 Prasyarat
+- **Docker Desktop** telah terinstal dan berjalan.
 
-Backend: Python (Flask, Flask-SocketIO)
+### ⚙️ Langkah-langkah
 
-Komunikasi Real-time (Web): WebSocket (via Socket.IO)
-
-Komunikasi Real-time (IoT): MQTT
-
-Database: PostgreSQL
-
-Hardware: ESP8266 / Arduino
-
-Containerization: Docker, Docker Compose
-
-🚀 Cara Menjalankan (Menggunakan Docker)
-
-Ini adalah cara yang direkomendasikan untuk menjalankan seluruh sistem dengan mudah.
-
-Prasyarat
-
-Docker Desktop terinstal dan berjalan.
-
-Langkah-langkah
-
-Clone Repository Ini:
-
-git clone [URL_REPOSITORY_ANDA]
-cd [NAMA_FOLDER_PROYEK]
+1. **Clone repository ini**
+   ```bash
+   git clone https://github.com/username/solar-panel-cleaner.git
+   cd solar-panel-cleaner
 
 
-Jalankan Docker Compose:
-Buka satu terminal di folder utama proyek dan jalankan perintah berikut. Ini akan membangun dan memulai semua layanan (frontend, backend, database, mosquitto).
-
-docker-compose up --build
-
-
-Akses Aplikasi:
-
-Buka browser dan akses antarmuka web di: http://localhost:5173
-
-Backend API berjalan di http://localhost:5000.
-
-📂 Struktur Folder Proyek
-
-.
-├── arduino_code/
-│   └── Solar_Panel_Cleaner.ino     # Kode untuk hardware
-├── public/
-│   └── solarpanel.jpg              # Aset gambar
-├── src/
-│   └── SolarPanelCleaner.jsx       # Komponen utama React
-├── backend.py                      # Server Flask & SocketIO
-├── docker-compose.yml              # Konfigurasi orkestrasi Docker
-├── backend.Dockerfile              # Instruksi build Docker untuk backend
-├── frontend.Dockerfile             # Instruksi build Docker untuk frontend
-├── mosquitto.conf                  # Konfigurasi broker MQTT
-├── package.json                    # Dependensi frontend
-└── requirements.txt                # Dependensi backend
