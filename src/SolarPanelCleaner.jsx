@@ -69,6 +69,13 @@ export default function SolarPanelCleaner() {
       setDirectionStatus(data.status);
       if (data.progress !== undefined) setProgress(data.progress);
       setSystemActive(data.status !== 'STANDBY' && data.status !== 'SELESAI');
+      if (data.status === 'SELESAI') {
+        setTimeout(() => {
+          setDirectionStatus('STANDBY');
+          setProgress(0);
+          setSystemActive(false);
+        }, 3000);
+      }
     });
     
     newSocket.on('progress_update', (data) => {

@@ -1,4 +1,3 @@
-# PERBAIKAN FINAL: Tambahkan ini di baris paling atas!
 import eventlet
 eventlet.monkey_patch()
 
@@ -6,14 +5,14 @@ from flask import Flask, request, jsonify
 from flask_socketio import SocketIO
 from flask_cors import CORS
 import time
-import threading # Diimpor hanya untuk Event
+import threading
 import datetime
 import psycopg2
 import psycopg2.extras
 import os
 import paho.mqtt.client as mqtt
 
-# --- KONFIGURASI ---
+# --- KONFIGURASI (MEMBACA DARI DOCKER ENVIRONMENT) ---
 DB_NAME = os.getenv("DB_NAME", "solar_cleaner_db")
 DB_USER = os.getenv("DB_USER", "postgres")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "ttz")
@@ -29,22 +28,30 @@ app = Flask(__name__)
 CORS(app)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
-# --- VARIABEL GLOBAL ---
+# ===============================
+# VARIABEL GLOBAL
+# ===============================
 cleaning_active = False
 stop_event = threading.Event()
 reverse_event = threading.Event()
 
-# --- FUNGSI DATABASE & LOGGING ---
+# ===============================
+# FUNGSI-FUNGSI DATABASE & LOGGING
+# ===============================
 def get_db_connection():
-    return psycopg2.connect(dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, host=DB_HOST, port=DB_PORT)
+    return psycopg2.connect(
+        dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, host=DB_HOST, port=DB_PORT
+    )
 
 def log_and_emit(action, status, type):
+    """Menyimpan log ke database DAN mengirimnya ke klien via Socket.IO."""
     conn = None; cur = None
     try:
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute("INSERT INTO logs (action, status, type) VALUES (%s, %s, %s)", (action, status, type))
         conn.commit()
+        print(f"📝 [DB] Log disimpan: {action} - {status}")
     except Exception as e:
         print(f"❌ [DB] Gagal menyimpan log: {e}")
         if conn: conn.rollback()
@@ -54,6 +61,7 @@ def log_and_emit(action, status, type):
     socketio.emit('log_update', {'action': action, 'status': status, 'type': type})
 
 def load_schedules_from_db():
+    """Membaca semua jadwal dari database dan mengembalikannya sebagai list."""
     schedules = []; conn = None; cur = None
     try:
         conn = get_db_connection()
@@ -68,7 +76,9 @@ def load_schedules_from_db():
         if conn: conn.close()
     return schedules
 
-# --- ROUTES / ENDPOINTS ---
+# ===============================
+# ROUTES / ENDPOINTS
+# ===============================
 @app.route('/set_schedule', methods=['POST'])
 def set_schedule():
     conn = None; cur = None
@@ -84,8 +94,10 @@ def set_schedule():
             psycopg2.extras.execute_values(cur, "INSERT INTO schedules (time_setting) VALUES %s", insert_data)
         conn.commit()
         log_and_emit('SET JADWAL', 'SUCCESS', 'schedule')
+        print(f"🔄 [JADWAL] Jadwal di database diperbarui menjadi: {new_schedules}")
         return jsonify({'message': 'Jadwal berhasil diperbarui', 'new_schedules': new_schedules})
     except Exception as e:
+        print(f"❌ [JADWAL] Error saat update jadwal DB: {e}")
         if conn: conn.rollback()
         return jsonify({'message': str(e)}), 500
     finally:
@@ -99,7 +111,8 @@ def start_cleaning():
     stop_event.clear(); reverse_event.clear(); cleaning_active = True
     print("🚀 [MQTT] Mengirim perintah 'start' ke robot...")
     mqtt_client.publish(MQTT_TOPIC_COMMAND, "start")
-    socketio.start_background_task(target=run_cleaning_cycle)
+    socketio.start_background_task(target=run_cleaning_cycle, action='START MANUAL', type='start')
+    print("✅ Request START diterima, tugas latar belakang dimulai")
     return jsonify({'message': 'Pembersihan dimulai'})
 
 @app.route('/stop', methods=['POST'])
@@ -126,95 +139,122 @@ def get_logs():
         if conn: conn.close()
     return jsonify(logs)
 
-# --- JEMBATAN MQTT ---
+# ===============================
+# JEMBATAN MQTT (Logika Dipindahkan ke Klien Global)
+# ===============================
+mqtt_client = mqtt.Client()
+
 def on_connect(client, userdata, flags, rc):
+    print(f"✅ [MQTT] Terhubung ke Broker dengan kode {rc}")
     client.subscribe(MQTT_TOPIC_STATUS)
 
 def on_message(client, userdata, msg):
     payload = msg.payload.decode().strip() 
     
-    # PERUBAHAN: Tangani pesan progres dari Arduino
+    # Menangani pesan progres
     if payload.startswith("P:"):
         try:
-            # Ambil nilai progres (misal dari "P:15" menjadi 15)
             progress_value = int(payload.split(':')[1])
-            # Langsung kirim ke UI
             socketio.emit('progress_update', {'progress': progress_value})
+            print(f"📊 Progress: {progress_value}%")
         except (IndexError, ValueError):
             print(f"⚠️ Pesan progres tidak valid: {payload}")
-        return # Hentikan proses di sini untuk pesan progres
+        return 
 
-    # Sisa logika tetap sama
-    if payload == "REACHED_BOTTOM":
+    # Menangani pesan status
+    print(f"📬 [MQTT] Menerima pesan: '{payload}'")
+    
+    # TAMBAHAN: Emit status ke frontend untuk setiap perubahan status
+    if payload == "TURUN":
+        socketio.emit('status_update', {'status': 'TURUN'})
+    elif payload == "NAIK":
+        socketio.emit('status_update', {'status': 'NAIK'})
+    elif payload == "KEMBALI":
+        socketio.emit('status_update', {'status': 'KEMBALI'})
+    elif payload == "REACHED_BOTTOM":
+        print("🚀 [MQTT] Sinyal balik terdeteksi!")
         reverse_event.set()
     elif payload == "STANDBY":
+        print("🏠 [MQTT] Robot sudah di posisi awal!")
         reset_to_standby()
+        log_and_emit('STOP COMPLETE', 'SUCCESS', 'stop')  # TAMBAHAN: Log stop complete
     elif payload == "SELESAI":
+        print("🎉 [MQTT] Robot selesai pembersihan!")
         reset_to_standby()
+        log_and_emit('PEMBERSIHAN SELESAI', 'SUCCESS', 'complete')  # TAMBAHAN: Log complete
 
-def mqtt_bridge_thread():
-    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1)
-    client.on_connect = on_connect
-    client.on_message = on_message
-    try:
-        client.connect(MQTT_BROKER, MQTT_PORT, 60)
-        client.loop_forever()
-    except Exception as e: print(f"❌ [MQTT Bridge] Gagal terhubung ke broker: {e}")
-
-mqtt_client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1)
-
-# --- FUNGSI UTAMA ---
-def run_cleaning_cycle():
+# ===============================
+# FUNGSI-FUNGSI UTAMA
+# ===============================
+def run_cleaning_cycle(action, type):
     global cleaning_active
-    print("\n🚀 [SISTEM] MEMULAI SIKLUS PEMBERSIHAN")
+    print("\n" + "="*60 + "\n🚀 [SISTEM] MEMULAI SIKLUS PEMBERSIHAN")
     try:
-        # PERUBAHAN: Hapus semua loop 'for progress'
         print("⬇️  [FASE 1] Menunggu robot bergerak TURUN...")
         socketio.emit('status_update', {'status': 'TURUN', 'progress': 0})
-        log_and_emit('START MANUAL', 'SUCCESS', 'start')
+        log_and_emit(action, 'SUCCESS', type)
         
-        # Cukup tunggu sinyal 'REACHED_BOTTOM', progress akan diupdate oleh on_message
         while not reverse_event.is_set():
-            if stop_event.is_set(): print("⏹️  Proses dihentikan saat fase TURUN"); return
+            if stop_event.is_set(): 
+                print("⏹️  [SISTEM] Proses dihentikan saat fase TURUN")
+                return
             socketio.sleep(0.1)
         
-        print("✅ Sinyal balik diterima! Melanjutkan...")
+        print("✅ [SISTEM] Sinyal balik diterima! Melanjutkan...")
         print("🚀 [MQTT] Mengirim perintah 'naik' ke robot...")
         mqtt_client.publish(MQTT_TOPIC_COMMAND, "naik")
+        
         print("⬆️  [FASE 3] Menunggu robot bergerak NAIK...")
         socketio.emit('status_update', {'status': 'NAIK', 'progress': 50})
         
-        # Di sini thread hanya menunggu sampai 'stop' ditekan. 
-        # Sinyal 'SELESAI' dari robot akan memicu reset.
-        while not stop_event.is_set():
-             socketio.sleep(0.5)
-
-    except Exception as e: print(f"❌ [ERROR] Terjadi kesalahan dalam siklus: {e}"); reset_to_standby()
+        # PERUBAHAN: Tidak perlu while loop lagi
+        # Arduino akan kirim "SELESAI" dan di-handle di on_message()
+        
+    except Exception as e: 
+        print(f"❌ [ERROR] Terjadi kesalahan dalam siklus: {e}")
+        reset_to_standby()
     finally:
         cleaning_active = False
-        print("✅ [SISTEM] Siklus pembersihan selesai atau dihentikan.\n")
+        print("="*60 + "\n✅ [SISTEM] Siklus pembersihan selesai atau dihentikan.\n" + "="*60 + "\n")
 
 def reset_to_standby():
     global cleaning_active
     cleaning_active = False
     socketio.emit('status_update', {'status': 'STANDBY', 'progress': 0})
+    print("🔄 [SISTEM] Reset ke STANDBY")
 
 def schedule_checker():
     global cleaning_active
+    last_executed_minute = None  # ✅ Variabel untuk track menit terakhir
+    
     while True:
         try:
             current_db_schedules = load_schedules_from_db()
             now = datetime.datetime.now().strftime("%H:%M")
-            if now in current_db_schedules and not cleaning_active:
+            
+            # ✅ CEK: Apakah sudah dijalankan di menit ini?
+            if now in current_db_schedules and not cleaning_active and now != last_executed_minute:
                 print(f"⏰ [AUTO] Menjalankan pembersihan otomatis ({now})")
-                log_and_emit('START AUTO', 'SUCCESS', 'auto')
                 stop_event.clear(); reverse_event.clear(); cleaning_active = True
+                last_executed_minute = now  # ✅ TANDAI bahwa menit ini sudah dijalankan
+                
+                print("🚀 [MQTT] Mengirim perintah 'start' ke robot (via Jadwal)...")
                 mqtt_client.publish(MQTT_TOPIC_COMMAND, "start")
-                socketio.start_background_task(target=run_cleaning_cycle)
-        except Exception as e: print(f"❌ [SCHEDULER] Error: {e}")
+                socketio.start_background_task(target=run_cleaning_cycle, action='START AUTO', type='auto')
+            
+            # ✅ RESET jika sudah ganti menit (agar bisa jalan lagi di jadwal berikutnya)
+            elif now != last_executed_minute:
+                # Menit sudah berganti, reset tracker
+                pass
+                
+        except Exception as e: 
+            print(f"❌ [SCHEDULER] Error: {e}")
+        
         socketio.sleep(5)
 
-# --- MAIN SERVER ---
+# ===============================
+# MAIN SERVER
+# ===============================
 if __name__ == '__main__':
     print("⏳ Menunggu database siap...")
     time.sleep(10)
@@ -229,16 +269,18 @@ if __name__ == '__main__':
         print("✅ [DB] Tabel 'schedules' dan 'logs' siap.")
     except Exception as e: print(f"❌ [DB] Gagal inisialisasi tabel: {e}")
 
+    # Atur callback untuk klien MQTT
+    mqtt_client.on_connect = on_connect
+    mqtt_client.on_message = on_message
+    
     try:
         mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
-        mqtt_client.loop_start()
-        print("✅ [MQTT Client] Terhubung ke broker.")
+        mqtt_client.loop_start() # Jalankan loop di thread terpisah (non-blocking)
+        print("✅ [MQTT Client] Terhubung dan mendengarkan di thread terpisah.")
     except Exception as e: print(f"❌ [MQTT Client] Gagal terhubung: {e}")
 
-    socketio.start_background_task(target=mqtt_bridge_thread)
     socketio.start_background_task(target=schedule_checker)
     
-    print("\n🚀 SOLAR PANEL CLEANER BACKEND v6.0 (Hardware Driven)\n")
+    print("\n" + "="*60 + "\n🚀 SOLAR PANEL CLEANER BACKEND v7.0 (Non-Blocking MQTT)\n" + "="*60 + "\n")
     
     socketio.run(app, host='0.0.0.0', port=5000)
-
