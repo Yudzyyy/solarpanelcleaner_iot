@@ -161,12 +161,10 @@ npm run build
 
 Untuk mengaktifkan pipeline CI/CD (push ke Docker Hub), tambahkan secrets berikut di **GitHub → Settings → Secrets and variables → Actions**:
 
-| Secret                | Deskripsi                                 |
-| --------------------- | ----------------------------------------- |
-| `DOCKER_HUB_USERNAME` | Username Docker Hub kamu                  |
-| `DOCKER_HUB_TOKEN`    | Access Token Docker Hub (bukan password!) |
-
-> 💡 **Cara membuat Docker Hub Token**: Login ke [hub.docker.com](https://hub.docker.com) → Account Settings → Security → New Access Token
+| Secret                | 
+| --------------------- |
+| `DOCKER_HUB_USERNAME` | 
+| `DOCKER_HUB_TOKEN`    |
 
 ---
 
