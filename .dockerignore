@@ -1,0 +1,49 @@
+# ================================
+# Solar Panel Cleaner — .dockerignore
+# ================================
+
+# Git
+.git
+.gitignore
+
+# Node.js
+node_modules
+npm-debug.log*
+
+# Python cache
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.env
+venv/
+.venv/
+env/
+
+# Testing & CI
+.pytest_cache
+.coverage
+htmlcov/
+test_*.py
+
+# Editor & OS
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Docker (tidak perlu copy Dockerfile ke dalam image)
+*.Dockerfile
+docker-compose*.yml
+
+# Front-end build output (dibuild di dalam container)
+dist/
