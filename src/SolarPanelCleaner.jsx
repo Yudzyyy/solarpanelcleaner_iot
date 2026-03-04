@@ -7,7 +7,7 @@ const BACKEND_URL = 'http://localhost:5000';
 
 export default function SolarPanelCleaner() {
   // --- STATE MANAGEMENT ---
-  const [socket, setSocket] = useState(null);
+
   const [isConnected, setIsConnected] = useState(false);
   const [systemActive, setSystemActive] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -99,7 +99,7 @@ export default function SolarPanelCleaner() {
       setLogs(prevLogs => [newLog, ...prevLogs].slice(0, 100));
     });
 
-    setSocket(newSocket);
+
 
     return () => {
       console.log('🔌 Menutup koneksi socket...');
